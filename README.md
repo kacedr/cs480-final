@@ -81,7 +81,6 @@ From the project root with your venv activated:
 You should see the main menu. Use the number keys to navigate.
 
 ## Project structure
-
     cs480-final/
     ├── README.md
     ├── .gitignore
@@ -90,20 +89,33 @@ You should see the main menu. Use the number keys to navigate.
     ├── requirements.txt
     ├── app/
     │   ├── __init__.py
-    │   ├── main.py           # entry point and menu loop
+    │   ├── main.py           # entry point, app lifecycle, action dispatch
     │   ├── db.py             # connection helper
-    │   └── queries.py        # all SQL operations
+    │   ├── queries.py        # all SQL operations
+    │   └── ui/
+    │       ├── __init__.py
+    │       ├── theme.py      # color pairs, box chars, banner text
+    │       ├── primitives.py # safe_addstr, draw_box, init_colors, sizing
+    │       ├── screens.py    # splash, main menu, status, pause
+    │       └── input.py      # get_command, get_field
     ├── db/
     │   ├── schema.sql        # CREATE TABLE statements
     │   ├── seed.sql          # sample data
     │   └── reset.sh          # drop, recreate, reload
     └── docs/
         └── ERD.png           # entity relationship diagram
-
 ## Workflow
 - All SQL queries live in app/queries.py. Keep them out of main.py.
+- New actions (menu items) go in app/main.py next to the existing ones and get wired into the ACTIONS dict.
+- UI helpers go in app/ui/. Reusable drawing → primitives.py, full screens → screens.py, input prompts → input.py, constants/colors → theme.py.
 - When you change the schema, update db/schema.sql and rerun ./db/reset.sh.
 - Commit your changes on main (try not to brick the code).
+## Git workflow
+    git pull 
+    # make changes
+    git add .
+    git commit -m "Short description of change"
+    git push
 ## Git workflow
     git pull 
     # make changes
