@@ -1,6 +1,5 @@
 # Entry point: app lifecycle, action dispatch.
 # UI primitives live in app/ui/, queries live in app/queries.py.
-
 import curses
 import time
 

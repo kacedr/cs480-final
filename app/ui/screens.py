@@ -1,6 +1,5 @@
 # Composed screens: splash, main menu, status messages, pause.
 # Built from primitives
-
 import curses
 import time
 

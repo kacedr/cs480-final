@@ -1,5 +1,4 @@
 # Drawing helpers
-
 import curses
 from app.ui.theme import (
     PAIR_DEFAULT, PAIR_BORDER, PAIR_TITLE, PAIR_OK, PAIR_ERR,

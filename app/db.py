@@ -1,5 +1,4 @@
-"""Database connection helper."""
-
+# Database connection helper
 import os
 import psycopg
 from dotenv import load_dotenv

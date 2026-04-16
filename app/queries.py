@@ -1,7 +1,5 @@
 # All database queries for the application.
-#
 # Keep SQL in this file. Do not put queries in main.py.
-
 from app.db import get_connection
 
 def ping():

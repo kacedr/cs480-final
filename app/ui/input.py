@@ -1,5 +1,4 @@
 # Input helpers
-
 import curses
 
 def get_command(stdscr, y, x, max_len=8):
