@@ -120,7 +120,7 @@ CREATE TABLE booking (
     -- Logic that handles overlapping, postgres will return an error if we try to 
     -- insert overlapping dates thus we need to handle all queries with try/catch
     -- which we should be doing anyway. just a reminder.
-    CHECK (end_date >= start_date),
+    CHECK (end_date > start_date),
     EXCLUDE USING gist (
         hotel_id    WITH =,
         room_number WITH =,
