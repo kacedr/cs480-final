@@ -37,8 +37,7 @@ MAIN_MENU_ITEMS = [
     ("1", "TEST DATABASE CONNECTION", PAIR_TITLE),
     ("2", "MANAGER LOGIN",            PAIR_TITLE),
     ("3", "CLIENT LOGIN",             PAIR_TITLE),
-    ("4", "REGISTER NEW CLIENT",      PAIR_TITLE),
-    ("5", "REGISTER NEW MANAGER",     PAIR_TITLE),
+    ("4", "HELP",                     PAIR_TITLE),
     ("0", "DISCONNECT",               PAIR_ERR),
 ]
 
