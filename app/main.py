@@ -5,10 +5,12 @@ import time
 
 from app import queries
 from app.ui.primitives import init_colors, box_width, draw_box, safe_addstr
-from app.ui.screens import splash, render_menu, show_status, pause
+from app.ui.screens import (
+    splash, render_main_menu, render_manager_menu, render_client_menu,
+    show_status, show_placeholder, pause,
+)
 from app.ui.input import get_command
-from app.ui.theme import PAIR_DEFAULT
-
+from app.ui.theme import PAIR_DEFAULT, QUIT_CMDS
 
 # Actions
 def test_connection_action(stdscr):
@@ -31,9 +33,27 @@ def test_connection_action(stdscr):
     pause(stdscr)
 
 
-ACTIONS = {
-    "1": test_connection_action,
-}
+# Subloops for each role
+def manager_loop(stdscr):
+    while True:
+        prompt_y, prompt_x = render_manager_menu(stdscr)
+        choice = get_command(stdscr, prompt_y, prompt_x)
+        if choice == "0":
+            return
+        rows, _ = stdscr.getmaxyx()
+        show_status(stdscr, rows - 3, 4, "todo", "warn")
+        time.sleep(0.8)
+
+
+def client_loop(stdscr):
+    while True:
+        prompt_y, prompt_x = render_client_menu(stdscr)
+        choice = get_command(stdscr, prompt_y, prompt_x)
+        if choice == "0":
+            return
+        rows, _ = stdscr.getmaxyx()
+        show_status(stdscr, rows - 3, 4, "todo", "warn")
+        time.sleep(0.8)
 
 
 # App lifecycle
@@ -44,18 +64,22 @@ def main(stdscr):
 
     splash(stdscr)
     while True:
-        prompt_y, prompt_x = render_menu(stdscr)
+        prompt_y, prompt_x = render_main_menu(stdscr)
         choice = get_command(stdscr, prompt_y, prompt_x)
-        if choice == "0":
+
+        if choice in QUIT_CMDS:
             return
-        action = ACTIONS.get(choice)
-        if action is None:
+        if choice == "1":
+            test_connection_action(stdscr)
+        elif choice == "2":
+            manager_loop(stdscr)
+        elif choice == "3":
+            client_loop(stdscr)
+        else:
             rows, _ = stdscr.getmaxyx()
             show_status(stdscr, rows - 3, 4,
                         "UNKNOWN COMMAND. CONSULT MANUAL.", "err")
             time.sleep(0.8)
-            continue
-        action(stdscr)
 
 
 if __name__ == "__main__":

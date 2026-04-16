@@ -7,6 +7,7 @@ from app.ui.theme import (
     PAIR_DEFAULT, PAIR_BORDER, PAIR_TITLE, PAIR_OK, PAIR_ERR,
     PAIR_WARN, PAIR_INFO, PAIR_DIM,
     BANNER, SUBTITLE, COPYRIGHT, TERMINAL,
+    MAIN_MENU_ITEMS, MANAGER_MENU_ITEMS, CLIENT_MENU_ITEMS,
 )
 from app.ui.primitives import (
     safe_addstr, box_width, center_x, draw_box, draw_separator,
@@ -67,44 +68,65 @@ def splash(stdscr):
             break
 
 
-# Main menu
-MENU_ITEMS = [
-    ("1", "TEST DATABASE CONNECTION", PAIR_TITLE),
-    ("2", "MANAGER LOGIN",            PAIR_TITLE),
-    ("3", "CLIENT LOGIN",             PAIR_TITLE),
-    ("4", "REGISTER NEW CLIENT",      PAIR_TITLE),
-    ("5", "REGISTER NEW MANAGER",     PAIR_TITLE),
-    ("0", "DISCONNECT",               PAIR_ERR),
-]
-
-
-def render_menu(stdscr):
+# Generic menu renderer 
+def _render_menu(stdscr, title, items, status_line=""):
     stdscr.clear()
     rows, cols = stdscr.getmaxyx()
     w = box_width(stdscr)
-    h = len(MENU_ITEMS) + 7
+
+    # Count gap, one extra row before the logout item
+    h = len(items) + 7
     y = max(1, (rows - h) // 2)
     x = (cols - w) // 2
 
-    draw_box(stdscr, y, x, w, h, "MAIN MENU")
+    draw_box(stdscr, y, x, w, h, title)
 
-    for i, (key, label, color) in enumerate(MENU_ITEMS):
-        row = y + 2 + i
+    row_offset = 0
+    for i, (key, label, color) in enumerate(items):
+        row = y + 2 + i + row_offset
         if key == "0":
-            row += 1   # gap before disconnect
-        safe_addstr(stdscr, row, x + 4, f"[{key}]", curses.color_pair(color))
-        safe_addstr(stdscr, row, x + 8, label, curses.color_pair(PAIR_DEFAULT))
+            row_offset += 1
+            row += 1
+        safe_addstr(stdscr, row, x + 4, f"[{key}]",
+                    curses.color_pair(color))
+        safe_addstr(stdscr, row, x + 4 + len(key) + 3, label,
+                    curses.color_pair(PAIR_DEFAULT))
 
     draw_separator(stdscr, y + h - 2, x, w)
-    status_line = "STATUS: ONLINE   USER: GUEST   SESSION: ACTIVE"
-    safe_addstr(stdscr, y + h - 1, x + (w - len(status_line)) // 2 - 1,
-                status_line, curses.color_pair(PAIR_OK) | curses.A_DIM)
+
+    if status_line:
+        safe_addstr(stdscr, y + h - 1,
+                    x + (w - len(status_line)) // 2 - 1,
+                    status_line,
+                    curses.color_pair(PAIR_OK) | curses.A_DIM)
 
     prompt_y = y + h + 1
     safe_addstr(stdscr, prompt_y, x, "command> ",
                 curses.color_pair(PAIR_OK) | curses.A_BOLD)
     stdscr.refresh()
     return prompt_y, x + 9
+
+
+# Specific menus
+def render_main_menu(stdscr):
+    return _render_menu(
+        stdscr, "MAIN MENU", MAIN_MENU_ITEMS,
+        "STATUS: ONLINE   USER: GUEST   SESSION: ACTIVE",
+    )
+
+
+def render_manager_menu(stdscr, name="MANAGER"):
+    return _render_menu(
+        stdscr, "MANAGER CONSOLE", MANAGER_MENU_ITEMS,
+        f"STATUS: ONLINE   USER: {name.upper()}   ROLE: MANAGER",
+    )
+
+
+def render_client_menu(stdscr, name="CLIENT"):
+    return _render_menu(
+        stdscr, "CLIENT CONSOLE", CLIENT_MENU_ITEMS,
+        f"STATUS: ONLINE   USER: {name.upper()}   ROLE: CLIENT",
+    )
 
 
 # Status / pause
@@ -122,6 +144,13 @@ def show_status(stdscr, y, x, msg, kind="info"):
                 curses.color_pair(pair) | curses.A_BOLD)
     safe_addstr(stdscr, y, x + 5, "]", curses.color_pair(PAIR_BORDER))
     safe_addstr(stdscr, y, x + 7, msg, curses.color_pair(PAIR_DEFAULT))
+    stdscr.refresh()
+
+
+def show_placeholder(stdscr, y, x):
+    """Placeholder for unimplemented query results."""
+    safe_addstr(stdscr, y, x, "[ AWAITING BACKEND LINK ]",
+                curses.color_pair(PAIR_WARN) | curses.A_BOLD)
     stdscr.refresh()
 
 
