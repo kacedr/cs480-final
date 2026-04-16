@@ -19,7 +19,7 @@ A terminal-based application for 480 final project built with Python and Postgre
 
 ## Prerequisites
 
-You need PostgreSQL and Python 3 installed locally.
+You need PostgreSQL and Python 3 installed locally. You also need a UNIX system to run this on (macos/linux, WSL might work but is untested). This is because the terminal program requires curses. You might be able to get away with installing curses with pip but that is untested.
 
 ### macOS (Homebrew)
 
@@ -31,10 +31,6 @@ You need PostgreSQL and Python 3 installed locally.
     sudo apt update
     sudo apt install postgresql postgresql-contrib python3-venv
     sudo service postgresql start
-
-### Windows
-
-Install Postgres from https://www.postgresql.org/download/windows/ and make sure psql is on your PATH. You will likely need a password in your DATABASE_URL.
 
 ## Setup
 
