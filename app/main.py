@@ -12,7 +12,7 @@ from app.ui.screens import (
     render_manual, show_status, show_placeholder, pause,
 )
 from app.ui.input import get_command
-from app.ui.theme import PAIR_DEFAULT, QUIT_CMDS
+from app.ui.theme import PAIR_DEFAULT, QUIT_CMDS, ERROR_UNKNOWN_COMMAND
 
 # Actions
 def test_connection_action(stdscr):
@@ -22,6 +22,7 @@ def test_connection_action(stdscr):
     x = (cols - w) // 2
     y = max(1, rows // 2 - 4)
 
+    # a bunch of filler, might be fun to make this actually mean something idk
     draw_box(stdscr, y, x, w, 5, "DATABASE LINK TEST")
     safe_addstr(stdscr, y + 2, x + 4, "DIALING POSTGRES BACKEND ...",
                 curses.color_pair(PAIR_DEFAULT))
@@ -48,19 +49,21 @@ def manager_access(stdscr):
             # TODO: draw_form for SSN, query manager, return record
             rows, _ = stdscr.getmaxyx()
             show_status(stdscr, rows - 3, 4, "todo", "warn")
-            time.sleep(0.8)
+            curses.flushinp()
+            stdscr.getch()
 
         elif choice == "2":
             # TODO: draw_form for name/SSN/email, insert manager
             rows, _ = stdscr.getmaxyx()
             show_status(stdscr, rows - 3, 4, "todo", "warn")
-            time.sleep(0.8)
+            curses.flushinp()
+            stdscr.getch()
 
         else:
             rows, _ = stdscr.getmaxyx()
-            show_status(stdscr, rows - 3, 4,
-                        "UNKNOWN COMMAND. CONSULT MANUAL.", "err")
-            time.sleep(0.8)
+            show_status(stdscr, rows - 3, 4, ERROR_UNKNOWN_COMMAND, "err")
+            curses.flushinp()
+            stdscr.getch()
 
 
 def client_access(stdscr):
@@ -75,19 +78,21 @@ def client_access(stdscr):
             # TODO: draw_form for email, query client, return record
             rows, _ = stdscr.getmaxyx()
             show_status(stdscr, rows - 3, 4, "todo", "warn")
-            time.sleep(0.8)
+            curses.flushinp()
+            stdscr.getch()
 
         elif choice == "2":
             # TODO: draw_form for name/email/address/card, insert client
             rows, _ = stdscr.getmaxyx()
             show_status(stdscr, rows - 3, 4, "todo", "warn")
-            time.sleep(0.8)
+            curses.flushinp()
+            stdscr.getch()
 
         else:
             rows, _ = stdscr.getmaxyx()
-            show_status(stdscr, rows - 3, 4,
-                        "UNKNOWN COMMAND. CONSULT MANUAL.", "err")
-            time.sleep(0.8)
+            show_status(stdscr, rows - 3, 4, ERROR_UNKNOWN_COMMAND, "err")
+            curses.flushinp()
+            stdscr.getch()
 
 
 def manual_action(stdscr):
@@ -103,7 +108,8 @@ def manager_loop(stdscr):
             return
         rows, _ = stdscr.getmaxyx()
         show_status(stdscr, rows - 3, 4, "todo", "warn")
-        time.sleep(0.8)
+        curses.flushinp()
+        stdscr.getch()
 
 
 def client_loop(stdscr):
@@ -114,12 +120,14 @@ def client_loop(stdscr):
             return
         rows, _ = stdscr.getmaxyx()
         show_status(stdscr, rows - 3, 4, "todo", "warn")
-        time.sleep(0.8)
+        curses.flushinp()
+        stdscr.getch()
 
 
 # App lifecycle
 def main(stdscr):
     curses.curs_set(0)
+    curses.mousemask(0)
     init_colors()
     stdscr.bkgd(" ", curses.color_pair(PAIR_DEFAULT))
 
@@ -140,9 +148,9 @@ def main(stdscr):
             manual_action(stdscr)
         else:
             rows, _ = stdscr.getmaxyx()
-            show_status(stdscr, rows - 3, 4,
-                        "UNKNOWN COMMAND. CONSULT MANUAL.", "err")
-            time.sleep(0.8)
+            show_status(stdscr, rows - 3, 4, ERROR_UNKNOWN_COMMAND, "err")
+            curses.flushinp()
+            stdscr.getch()
 
 
 if __name__ == "__main__":

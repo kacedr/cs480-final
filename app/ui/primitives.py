@@ -20,7 +20,6 @@ def init_colors():
 
 
 def safe_addstr(stdscr, y, x, text, attr=0):
-    # addstr that won't crash on edge-of-screen writes
     try:
         stdscr.addstr(y, x, text, attr)
     except curses.error:

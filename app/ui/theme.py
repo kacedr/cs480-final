@@ -4,6 +4,8 @@
 # ctrl-c also works lmao
 QUIT_CMDS = {"0", ":q", "quit", "exit"}
 
+ERROR_UNKNOWN_COMMAND = "UNKNOWN COMMAND. CONSULT MANUAL. PRESS ANY KEY TO RETURN"
+
 # Color pair IDs (defined in primitives.init_colors)
 PAIR_DEFAULT = 1
 PAIR_BORDER  = 2   # cyan border
