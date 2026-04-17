@@ -35,10 +35,22 @@ TERMINAL  = "TERMINAL READY  -  VT220 EMULATION  -  9600 BAUD"
 # Menu definitions
 MAIN_MENU_ITEMS = [
     ("1", "TEST DATABASE CONNECTION", PAIR_TITLE),
-    ("2", "MANAGER LOGIN",            PAIR_TITLE),
-    ("3", "CLIENT LOGIN",             PAIR_TITLE),
-    ("4", "HELP",                     PAIR_TITLE),
+    ("2", "MANAGER LOGIN/REGISTER",   PAIR_TITLE),
+    ("3", "CLIENT LOGIN/REGISTER",    PAIR_TITLE),
+    ("4", "MANUAL",                   PAIR_TITLE),
     ("0", "DISCONNECT",               PAIR_ERR),
+]
+
+MANAGER_LOGIN_ITEMS = [
+    ("1", "LOGIN WITH SSN",      PAIR_TITLE),
+    ("2", "REGISTER NEW MANAGER", PAIR_TITLE),
+    ("0", "BACK",                 PAIR_ERR),
+]
+
+CLIENT_LOGIN_ITEMS = [
+    ("1", "LOGIN WITH EMAIL",     PAIR_TITLE),
+    ("2", "REGISTER NEW CLIENT",  PAIR_TITLE),
+    ("0", "BACK",                 PAIR_ERR),
 ]
 
 MANAGER_MENU_ITEMS = [

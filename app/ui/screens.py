@@ -1,5 +1,4 @@
 # Composed screens: splash, main menu, status messages, pause.
-# Built from primitives
 import curses
 import time
 
@@ -7,7 +6,8 @@ from app.ui.theme import (
     PAIR_DEFAULT, PAIR_BORDER, PAIR_TITLE, PAIR_OK, PAIR_ERR,
     PAIR_WARN, PAIR_INFO, PAIR_DIM,
     BANNER, SUBTITLE, COPYRIGHT, TERMINAL,
-    MAIN_MENU_ITEMS, MANAGER_MENU_ITEMS, CLIENT_MENU_ITEMS,
+    MAIN_MENU_ITEMS, MANAGER_LOGIN_ITEMS, CLIENT_LOGIN_ITEMS,
+    MANAGER_MENU_ITEMS, CLIENT_MENU_ITEMS,
 )
 from app.ui.primitives import (
     safe_addstr, box_width, center_x, draw_box, draw_separator,
@@ -69,7 +69,7 @@ def splash(stdscr):
 
 
 # Generic menu renderer 
-def _render_menu(stdscr, title, items, status_line=""):
+def render_menu(stdscr, title, items, status_line=""):
     stdscr.clear()
     rows, cols = stdscr.getmaxyx()
     w = box_width(stdscr)
@@ -109,24 +109,143 @@ def _render_menu(stdscr, title, items, status_line=""):
 
 # Specific menus
 def render_main_menu(stdscr):
-    return _render_menu(
+    return render_menu(
         stdscr, "MAIN MENU", MAIN_MENU_ITEMS,
         "STATUS: ONLINE   USER: GUEST   SESSION: ACTIVE",
     )
 
 
+def render_manager_login_menu(stdscr):
+    return render_menu(
+        stdscr, "MANAGER ACCESS", MANAGER_LOGIN_ITEMS,
+    )
+
+
+def render_client_login_menu(stdscr):
+    return render_menu(
+        stdscr, "CLIENT ACCESS", CLIENT_LOGIN_ITEMS,
+    )
+
+
 def render_manager_menu(stdscr, name="MANAGER"):
-    return _render_menu(
+    return render_menu(
         stdscr, "MANAGER CONSOLE", MANAGER_MENU_ITEMS,
         f"STATUS: ONLINE   USER: {name.upper()}   ROLE: MANAGER",
     )
 
 
 def render_client_menu(stdscr, name="CLIENT"):
-    return _render_menu(
+    return render_menu(
         stdscr, "CLIENT CONSOLE", CLIENT_MENU_ITEMS,
         f"STATUS: ONLINE   USER: {name.upper()}   ROLE: CLIENT",
     )
+
+
+def render_manual(stdscr):
+    MANUAL_LINES = [
+        ("NAVIGATION",                                  PAIR_TITLE,  True),
+        ("  [0] / :q / quit ........... BACK / DISCONNECT", PAIR_DEFAULT, False),
+        ("  [1-9]                       SELECT OPTION",     PAIR_DEFAULT, False),
+        ("",                                             PAIR_DEFAULT, False),
+        ("ROLES",                                        PAIR_TITLE,  True),
+        ("  MANAGER .................. HOTELS, ROOMS, REPORTS", PAIR_DEFAULT, False),
+        ("  CLIENT ................... SEARCH, BOOK, REVIEW",   PAIR_DEFAULT, False),
+        ("",                                             PAIR_DEFAULT, False),
+        ("MANAGER CAN",                                  PAIR_TITLE,  True),
+        ("  [1]  INSERT HOTEL",                            PAIR_DEFAULT, False),
+        ("  [2]  INSERT ROOM",                             PAIR_DEFAULT, False),
+        ("  [3]  UPDATE HOTEL",                            PAIR_DEFAULT, False),
+        ("  [4]  UPDATE ROOM",                             PAIR_DEFAULT, False),
+        ("  [5]  REMOVE HOTEL",                            PAIR_DEFAULT, False),
+        ("  [6]  REMOVE ROOM",                             PAIR_DEFAULT, False),
+        ("  [7]  REMOVE CLIENT",                           PAIR_DEFAULT, False),
+        ("  [8]  TOP-K CLIENTS BY BOOKINGS",               PAIR_DEFAULT, False),
+        ("  [9]  ROOM BOOKING COUNTS",                     PAIR_DEFAULT, False),
+        ("  [10] HOTEL STATISTICS",                        PAIR_DEFAULT, False),
+        ("  [11] CLIENTS BY CITY PAIR",                    PAIR_DEFAULT, False),
+        ("  [12] PROBLEMATIC HOTELS",                      PAIR_DEFAULT, False),
+        ("  [13] CLIENT SPENDING REPORT",                  PAIR_DEFAULT, False),
+        ("",                                             PAIR_DEFAULT, False),
+        ("CLIENT CAN",                                   PAIR_TITLE,  True),
+        ("  [1]  UPDATE MY NAME",                          PAIR_DEFAULT, False),
+        ("  [2]  MANAGE ADDRESSES",                        PAIR_DEFAULT, False),
+        ("  [3]  MANAGE CREDIT CARDS",                     PAIR_DEFAULT, False),
+        ("  [4]  SEARCH AVAILABLE ROOMS BY DATE",          PAIR_DEFAULT, False),
+        ("  [5]  BOOK A ROOM (MANUAL)",                    PAIR_DEFAULT, False),
+        ("  [6]  AUTO-BOOK",                               PAIR_DEFAULT, False),
+        ("  [7]  VIEW MY BOOKINGS",                        PAIR_DEFAULT, False),
+        ("  [8]  WRITE REVIEW (MUST HAVE STAYED)",         PAIR_DEFAULT, False),
+        ("",                                             PAIR_DEFAULT, False),
+        ("BOOKING RULES",                                PAIR_TITLE,  True),
+        ("  - DATE RANGE IS INCLUSIVE [START, END]",        PAIR_DEFAULT, False),
+        ("  - NO OVERLAPPING BOOKINGS ON SAME ROOM",       PAIR_DEFAULT, False),
+        ("  - END DATE MUST BE AFTER START DATE",          PAIR_DEFAULT, False),
+        ("",                                             PAIR_DEFAULT, False),
+        ("REGISTRATION",                                 PAIR_TITLE,  True),
+        ("  - MANAGERS REGISTER WITH NAME, SSN, EMAIL",    PAIR_DEFAULT, False),
+        ("  - CLIENTS REGISTER WITH NAME, EMAIL,",         PAIR_DEFAULT, False),
+        ("    ADDRESS(ES), AND CREDIT CARD(S)",            PAIR_DEFAULT, False),
+        ("  - CLIENT EMAIL MUST BE UNIQUE",                PAIR_DEFAULT, False),
+        ("  - CLIENTS MUST HAVE >= 1 ADDRESS & >= 1 CARD", PAIR_DEFAULT, False),
+    ]
+
+    scroll = 0
+    total = len(MANUAL_LINES)
+
+    while True:
+        stdscr.clear()
+        rows, cols = stdscr.getmaxyx()
+        w = box_width(stdscr)
+        x = (cols - w) // 2
+
+        # Reserve rows: 1 top border, 1 title, 1 bottom border, 2 footer
+        visible = rows - 6
+        max_scroll = max(0, total - visible)
+        scroll = max(0, min(scroll, max_scroll))
+
+        draw_box(stdscr, 0, x, w, rows - 2, "SYSTEM MANUAL")
+
+        # Draw visible portion
+        for i in range(visible):
+            idx = scroll + i
+            if idx >= total:
+                break
+            text, pair, bold = MANUAL_LINES[idx]
+            attr = curses.color_pair(pair)
+            if bold:
+                attr |= curses.A_BOLD
+            safe_addstr(stdscr, 2 + i, x + 3, text, attr)
+
+        # Scroll indicator
+        if total > visible:
+            pct = int((scroll / max_scroll) * 100) if max_scroll > 0 else 100
+            indicator = f" LINE {scroll + 1}-{min(scroll + visible, total)} OF {total}  ({pct}%) "
+            safe_addstr(stdscr, rows - 3, x + w - len(indicator) - 2,
+                        indicator, curses.color_pair(PAIR_DIM) | curses.A_DIM)
+
+        # Footer
+        footer = "j/k  SCROLL   q/0  BACK"
+        safe_addstr(stdscr, rows - 2, (cols - len(footer)) // 2,
+                    footer, curses.color_pair(PAIR_DIM) | curses.A_DIM)
+
+        stdscr.refresh()
+
+        # Input
+        ch = stdscr.getch()
+        if ch in (ord("q"), ord("0")):
+            return
+        elif ch in (ord("j"), curses.KEY_DOWN):
+            scroll += 1
+        elif ch in (ord("k"), curses.KEY_UP):
+            scroll -= 1
+        elif ch in (ord("d"), curses.KEY_NPAGE):   # half-page down
+            scroll += visible // 2
+        elif ch in (ord("u"), curses.KEY_PPAGE):   # half-page up
+            scroll -= visible // 2
+        elif ch in (ord("g"),):                     # top
+            scroll = 0
+        elif ch in (ord("G"),):                     # bottom
+            scroll = max_scroll
 
 
 # Status / pause
@@ -148,9 +267,7 @@ def show_status(stdscr, y, x, msg, kind="info"):
 
 
 def show_placeholder(stdscr, y, x):
-    """Placeholder for unimplemented query results."""
-    safe_addstr(stdscr, y, x, "[ AWAITING BACKEND LINK ]",
-                curses.color_pair(PAIR_WARN) | curses.A_BOLD)
+    safe_addstr(stdscr, y, x, "todo", curses.color_pair(PAIR_WARN) | curses.A_BOLD)
     stdscr.refresh()
 
 
