@@ -53,3 +53,19 @@ def draw_box(stdscr, y, x, w, h, title=""):
 def draw_separator(stdscr, y, x, w):
     border = curses.color_pair(PAIR_BORDER)
     safe_addstr(stdscr, y, x, LT + H * (w - 2) + RT, border)
+
+def handle_scroll(ch, scroll, visible, max_scroll):
+    import curses
+    if ch in (ord("j"), curses.KEY_DOWN):
+        return min(scroll + 1, max_scroll), True
+    if ch in (ord("k"), curses.KEY_UP):
+        return max(scroll - 1, 0), True
+    if ch in (ord("d"), curses.KEY_NPAGE):
+        return min(scroll + visible // 2, max_scroll), True
+    if ch in (ord("u"), curses.KEY_PPAGE):
+        return max(scroll - visible // 2, 0), True
+    if ch == ord("g"):
+        return 0, True
+    if ch == ord("G"):
+        return max_scroll, True
+    return scroll, False

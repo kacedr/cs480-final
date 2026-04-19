@@ -10,7 +10,7 @@ from app.ui.theme import (
     MANAGER_MENU_ITEMS, CLIENT_MENU_ITEMS,
 )
 from app.ui.primitives import (
-    safe_addstr, box_width, center_x, draw_box, draw_separator,
+    safe_addstr, box_width, center_x, draw_box, draw_separator, handle_scroll,
 )
 
 
@@ -69,10 +69,6 @@ def splash(stdscr):
 
 # generic scrollable menu rendering, could probably merge this with manual menu  rendering but oh well
 def render_menu(stdscr, title, items, status_line=""):
-    """
-    Scrollable menu. Handles its own input loop.
-    Returns the key string of the selected item, or None if user backed out.
-    """
     from app.ui.theme import QUIT_CMDS
     from app.ui.input import get_command
 
@@ -84,14 +80,13 @@ def render_menu(stdscr, title, items, status_line=""):
         w = box_width(stdscr)
         x = (cols - w) // 2
 
-        # Reserve: title row, top border, bottom border, separator+status, prompt row, padding
         reserved = 7
         visible = max(3, rows - reserved)
         total = len(items)
         needs_scroll = total > visible
         shown = min(visible, total)
 
-        h = shown + 5   # top border + blank + items + separator + status + bottom
+        h = shown + 5
         y = max(1, (rows - h - 2) // 2)
 
         max_scroll = max(0, total - shown)
@@ -99,7 +94,6 @@ def render_menu(stdscr, title, items, status_line=""):
 
         draw_box(stdscr, y, x, w, h, title)
 
-        # Draw visible items
         for i in range(shown):
             idx = scroll + i
             if idx >= total:
@@ -111,7 +105,6 @@ def render_menu(stdscr, title, items, status_line=""):
             safe_addstr(stdscr, row, x + 4 + len(key) + 3, label,
                         curses.color_pair(PAIR_DEFAULT))
 
-        # Scroll indicators
         if needs_scroll:
             if scroll > 0:
                 safe_addstr(stdscr, y + 1, x + w - 4, "▲",
@@ -136,78 +129,86 @@ def render_menu(stdscr, title, items, status_line=""):
                     curses.color_pair(PAIR_OK) | curses.A_BOLD)
         stdscr.refresh()
 
-        # Peek for scroll keys without entering command mode
         stdscr.nodelay(False)
         ch = stdscr.getch()
 
-        # Scroll keys
-        if ch in (ord("j"), curses.KEY_DOWN):
-            scroll += 1
-            continue
-        if ch in (ord("k"), curses.KEY_UP):
-            scroll -= 1
-            continue
-        if ch == curses.KEY_NPAGE:
-            scroll += visible // 2
-            continue
-        if ch == curses.KEY_PPAGE:
-            scroll -= visible // 2
-            continue
-        if ch == ord("g"):
-            scroll = 0
-            continue
-        if ch == ord("G"):
-            scroll = max_scroll
+        new_scroll, consumed = handle_scroll(ch, scroll, visible, max_scroll)
+        if consumed:
+            scroll = new_scroll
             continue
 
-        # Anything else — push it back and let get_command handle it
         curses.ungetch(ch)
         choice = get_command(stdscr, prompt_y, x + 9)
         return choice
 
 # Display a table of results in a box. Blocks until user hits enter.
 def render_table(stdscr, title, headers, rows):
-    stdscr.clear()
-    scr_rows, scr_cols = stdscr.getmaxyx()
-
-    # Compute column widths from headers and data
     col_widths = [len(h) for h in headers]
     for row in rows:
         for i, cell in enumerate(row):
             col_widths[i] = max(col_widths[i], len(str(cell)))
 
-    # Total width: sum of cols + separators (" | ") + box padding
-    table_width = sum(col_widths) + 3 * (len(headers) - 1)
-    w = min(max(table_width + 6, 40), scr_cols - 2)
+    scroll = 0
+    total = len(rows)
 
-    h = len(rows) + 6
-    y = max(1, (scr_rows - h) // 2)
-    x = (scr_cols - w) // 2
+    while True:
+        stdscr.clear()
+        scr_rows, scr_cols = stdscr.getmaxyx()
 
-    draw_box(stdscr, y, x, w, h, title)
+        table_width = sum(col_widths) + 3 * (len(headers) - 1)
+        w = min(max(table_width + 6, 40), scr_cols - 2)
 
-    # Header row
-    header_line = "   ".join(h.ljust(col_widths[i]) for i, h in enumerate(headers))
-    safe_addstr(stdscr, y + 2, x + 3, header_line,
-                curses.color_pair(PAIR_TITLE) | curses.A_BOLD)
+        reserved = 8
+        visible = max(3, scr_rows - reserved)
+        shown = min(visible, total) if total else 1
+        max_scroll = max(0, total - shown)
+        scroll = max(0, min(scroll, max_scroll))
 
-    # Separator under headers
-    sep = "─" * len(header_line)
-    safe_addstr(stdscr, y + 3, x + 3, sep,
-                curses.color_pair(PAIR_BORDER))
+        h = shown + 6
+        y = max(1, (scr_rows - h) // 2)
+        x = (scr_cols - w) // 2
 
-    # Data rows
-    for i, row in enumerate(rows):
-        line = "   ".join(str(cell).ljust(col_widths[j]) for j, cell in enumerate(row))
-        safe_addstr(stdscr, y + 4 + i, x + 3, line,
-                    curses.color_pair(PAIR_DEFAULT))
+        draw_box(stdscr, y, x, w, h, title)
 
-    if not rows:
-        safe_addstr(stdscr, y + 4, x + 3, "[ NO RESULTS ]",
-                    curses.color_pair(PAIR_WARN) | curses.A_BOLD)
+        header_line = "   ".join(hd.ljust(col_widths[i]) for i, hd in enumerate(headers))
+        safe_addstr(stdscr, y + 2, x + 3, header_line,
+                    curses.color_pair(PAIR_TITLE) | curses.A_BOLD)
+        safe_addstr(stdscr, y + 3, x + 3, "─" * len(header_line),
+                    curses.color_pair(PAIR_BORDER))
 
-    stdscr.refresh()
-    pause(stdscr)
+        if not rows:
+            safe_addstr(stdscr, y + 4, x + 3, "[ NO RESULTS ]",
+                        curses.color_pair(PAIR_WARN) | curses.A_BOLD)
+        else:
+            for i in range(shown):
+                idx = scroll + i
+                if idx >= total:
+                    break
+                line = "   ".join(str(cell).ljust(col_widths[j])
+                                  for j, cell in enumerate(rows[idx]))
+                safe_addstr(stdscr, y + 4 + i, x + 3, line,
+                            curses.color_pair(PAIR_DEFAULT))
+
+            if total > visible:
+                if scroll > 0:
+                    safe_addstr(stdscr, y + 1, x + w - 4, "▲",
+                                curses.color_pair(PAIR_WARN) | curses.A_BOLD)
+                if scroll < max_scroll:
+                    safe_addstr(stdscr, y + h - 2, x + w - 4, "▼",
+                                curses.color_pair(PAIR_WARN) | curses.A_BOLD)
+                indicator = f" {scroll + 1}-{scroll + shown}/{total} "
+                safe_addstr(stdscr, y, x + w - len(indicator) - 4, indicator,
+                            curses.color_pair(PAIR_DIM) | curses.A_DIM)
+
+        footer = "j/k SCROLL   enter/q RETURN"
+        safe_addstr(stdscr, y + h + 1, (scr_cols - len(footer)) // 2, footer,
+                    curses.color_pair(PAIR_DIM) | curses.A_DIM)
+        stdscr.refresh()
+
+        ch = stdscr.getch()
+        if ch in (10, 13, curses.KEY_ENTER, ord("q"), ord("0")):
+            return
+        scroll, _ = handle_scroll(ch, scroll, visible, max_scroll)
 
 # Specific menus
 def render_main_menu(stdscr):
@@ -336,18 +337,7 @@ def render_manual(stdscr):
         ch = stdscr.getch()
         if ch in (ord("q"), ord("0")):
             return
-        elif ch in (ord("j"), curses.KEY_DOWN):
-            scroll += 1
-        elif ch in (ord("k"), curses.KEY_UP):
-            scroll -= 1
-        elif ch in (ord("d"), curses.KEY_NPAGE):   # half-page down
-            scroll += visible // 2
-        elif ch in (ord("u"), curses.KEY_PPAGE):   # half-page up
-            scroll -= visible // 2
-        elif ch in (ord("g"),):                     # top
-            scroll = 0
-        elif ch in (ord("G"),):                     # bottom
-            scroll = max_scroll
+        scroll, _ = handle_scroll(ch, scroll, visible, max_scroll)
 
 
 # Status / pause
