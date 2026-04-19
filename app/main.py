@@ -1,4 +1,4 @@
-# Entry point: app lifecycle, action dispatch.
+# Entry point
 # UI primitives live in app/ui/, queries live in app/queries.py.
 import curses
 import time
@@ -9,13 +9,14 @@ from app.ui.screens import (
     splash, render_main_menu,
     render_manager_login_menu, render_client_login_menu,
     render_manager_menu, render_client_menu,
-    render_manual, show_status, show_placeholder, pause,
+    render_manual, render_table, show_status, show_placeholder, pause,
 )
-from app.ui.input import get_command, draw_form, draw_repeating_form
+from app.ui.input import get_command, draw_form, draw_repeating_form, confirm
 from app.ui.theme import PAIR_DEFAULT, QUIT_CMDS
 
 # Actions
 def test_connection_action(stdscr):
+    """Test connection to postgres database"""
     stdscr.clear()
     rows, cols = stdscr.getmaxyx()
     w = box_width(stdscr)
@@ -99,8 +100,7 @@ def do_manager_register(stdscr):
 def manager_access(stdscr):
     """Login/register gate before the manager console."""
     while True:
-        prompt_y, prompt_x = render_manager_login_menu(stdscr)
-        choice = get_command(stdscr, prompt_y, prompt_x)
+        choice = render_manager_login_menu(stdscr)
 
         if choice in QUIT_CMDS:
             return
@@ -226,8 +226,7 @@ def do_client_register(stdscr):
 def client_access(stdscr):
     """Login/register gate before the client console."""
     while True:
-        prompt_y, prompt_x = render_client_login_menu(stdscr)
-        choice = get_command(stdscr, prompt_y, prompt_x)
+        choice = render_client_login_menu(stdscr)
 
         if choice in QUIT_CMDS:
             return
@@ -254,24 +253,248 @@ def client_access(stdscr):
 def manual_action(stdscr):
     render_manual(stdscr)
 
+# Manager actions
+def after_action(stdscr, msg, kind="ok"):
+    rows, _ = stdscr.getmaxyx()
+    show_status(stdscr, rows - 3, 4, msg, kind)
+    curses.flushinp()
+    stdscr.getch()
+
+
+def mgr_insert_hotel(stdscr):
+    vals = draw_form(stdscr, "INSERT HOTEL", [
+        ("HOTEL NAME",    128),
+        ("STREET NAME",    64),
+        ("STREET NUMBER",  20),
+        ("CITY",           64),
+    ])
+    if not vals:
+        return
+    try:
+        hotel_id = queries.insert_hotel(*vals)
+        after_action(stdscr, f"HOTEL CREATED. ID = {hotel_id}", "ok")
+    except Exception as e:
+        after_action(stdscr, f"INSERT FAILED: {e}", "err")
+
+
+def mgr_insert_room(stdscr):
+    vals = draw_form(stdscr, "INSERT ROOM", [
+        ("HOTEL ID",               10),
+        ("ROOM NUMBER",            10),
+        ("NUM WINDOWS",             5),
+        ("LAST RENO YEAR",          4),
+        ("ACCESS (elevator/stairs)", 10),
+    ])
+    if not vals:
+        return
+    try:
+        queries.insert_room(
+            int(vals[0]), int(vals[1]),
+            int(vals[2]), int(vals[3]),
+            vals[4],
+        )
+        after_action(stdscr, f"ROOM {vals[1]} ADDED TO HOTEL {vals[0]}.", "ok")
+    except Exception as e:
+        after_action(stdscr, f"INSERT FAILED: {e}", "err")
+
+
+def mgr_update_hotel(stdscr):
+    vals = draw_form(stdscr, "UPDATE HOTEL", [
+        ("HOTEL ID",          10),
+        ("NEW NAME",         128),
+        ("NEW STREET NAME",   64),
+        ("NEW STREET NUMBER", 20),
+        ("NEW CITY",          64),
+    ])
+    if not vals:
+        return
+    try:
+        queries.update_hotel(int(vals[0]), vals[1], vals[2], vals[3], vals[4])
+        after_action(stdscr, f"HOTEL {vals[0]} UPDATED.", "ok")
+    except Exception as e:
+        after_action(stdscr, f"UPDATE FAILED: {e}", "err")
+
+
+def mgr_update_room(stdscr):
+    vals = draw_form(stdscr, "UPDATE ROOM", [
+        ("HOTEL ID",               10),
+        ("ROOM NUMBER",            10),
+        ("NUM WINDOWS",             5),
+        ("LAST RENO YEAR",          4),
+        ("ACCESS (elevator/stairs)", 10),
+    ])
+    if not vals:
+        return
+    try:
+        queries.update_room(
+            int(vals[0]), int(vals[1]),
+            int(vals[2]), int(vals[3]),
+            vals[4],
+        )
+        after_action(stdscr, f"ROOM {vals[1]} IN HOTEL {vals[0]} UPDATED.", "ok")
+    except Exception as e:
+        after_action(stdscr, f"UPDATE FAILED: {e}", "err")
+
+
+def mgr_remove_hotel(stdscr):
+    vals = draw_form(stdscr, "REMOVE HOTEL", [
+        ("HOTEL ID", 10),
+    ])
+    if not vals:
+        return
+    if not confirm(stdscr, f"CONFIRM REMOVAL OF HOTEL {vals[0]}?"):
+        after_action(stdscr, "OPERATION CANCELLED.", "warn")
+        return
+    try:
+        queries.remove_hotel(int(vals[0]))
+        after_action(stdscr, f"HOTEL {vals[0]} REMOVED.", "ok")
+    except Exception as e:
+        after_action(stdscr, f"REMOVE FAILED: {e}", "err")
+
+
+def mgr_remove_room(stdscr):
+    vals = draw_form(stdscr, "REMOVE ROOM", [
+        ("HOTEL ID",    10),
+        ("ROOM NUMBER", 10),
+    ])
+    if not vals:
+        return
+    if not confirm(stdscr, f"CONFIRM REMOVAL OF ROOM {vals[1]} IN HOTEL {vals[0]}?"):
+        after_action(stdscr, "OPERATION CANCELLED.", "warn")
+        return
+    try:
+        queries.remove_room(int(vals[0]), int(vals[1]))
+        after_action(stdscr, f"ROOM {vals[1]} IN HOTEL {vals[0]} REMOVED.", "ok")
+    except Exception as e:
+        after_action(stdscr, f"REMOVE FAILED: {e}", "err")
+
+
+def mgr_remove_client(stdscr):
+    vals = draw_form(stdscr, "REMOVE CLIENT", [
+        ("CLIENT ID", 10),
+    ])
+    if not vals:
+        return
+    if not confirm(stdscr, f"CONFIRM REMOVAL OF CLIENT {vals[0]}?"):
+        after_action(stdscr, "OPERATION CANCELLED.", "warn")
+        return
+    try:
+        queries.remove_client(int(vals[0]))
+        after_action(stdscr, f"CLIENT {vals[0]} REMOVED.", "ok")
+    except Exception as e:
+        after_action(stdscr, f"REMOVE FAILED: {e}", "err")
+
+
+def mgr_top_k_clients(stdscr):
+    vals = draw_form(stdscr, "TOP-K CLIENTS BY BOOKINGS", [
+        ("K", 5),
+    ])
+    if not vals:
+        return
+    try:
+        k = int(vals[0])
+        if k <= 0:
+            raise ValueError("K must be positive")
+        results = queries.top_k_clients_by_bookings(k)
+    except Exception as e:
+        after_action(stdscr, f"QUERY FAILED: {e}", "err")
+        return
+
+    render_table(
+        stdscr,
+        f"TOP-{k} CLIENTS BY BOOKINGS",
+        ["NAME", "EMAIL", "BOOKINGS"],
+        results,
+    )
+
+def mgr_list_hotels(stdscr):
+    try:
+        results = queries.list_hotels()
+    except Exception as e:
+        after_action(stdscr, f"QUERY FAILED: {e}", "err")
+        return
+    render_table(
+        stdscr,
+        "HOTELS",
+        ["ID", "NAME", "STREET", "NUMBER", "CITY"],
+        results,
+    )
+
+
+def mgr_list_rooms(stdscr):
+    vals = draw_form(stdscr, "LIST ROOMS (BLANK = ALL)", [
+        ("HOTEL ID (OPTIONAL)", 10),
+    ])
+    if vals is None:
+        return
+    hotel_id = None
+    if vals[0]:
+        try:
+            hotel_id = int(vals[0])
+        except ValueError:
+            after_action(stdscr, "HOTEL ID MUST BE A NUMBER.", "err")
+            return
+    try:
+        results = queries.list_rooms(hotel_id)
+    except Exception as e:
+        after_action(stdscr, f"QUERY FAILED: {e}", "err")
+        return
+    render_table(
+        stdscr,
+        "ROOMS" + (f" (HOTEL {hotel_id})" if hotel_id else ""),
+        ["HOTEL ID", "HOTEL", "ROOM", "WINDOWS", "RENO", "ACCESS"],
+        results,
+    )
+
+
+def mgr_list_clients(stdscr):
+    try:
+        results = queries.list_clients()
+    except Exception as e:
+        after_action(stdscr, f"QUERY FAILED: {e}", "err")
+        return
+    render_table(
+        stdscr,
+        "CLIENTS",
+        ["ID", "NAME", "EMAIL"],
+        results,
+    )
 
 # Loops for each user and their actions
+MANAGER_ACTIONS = {
+    "1":  mgr_list_hotels,
+    "2":  mgr_list_rooms,
+    "3":  mgr_list_clients,
+    "4":  mgr_insert_hotel,
+    "5":  mgr_insert_room,
+    "6":  mgr_update_hotel,
+    "7":  mgr_update_room,
+    "8":  mgr_remove_hotel,
+    "9":  mgr_remove_room,
+    "10": mgr_remove_client,
+    "11": mgr_top_k_clients,
+}
+
 def manager_loop(stdscr, manager_row):
+    """manager_row = (ssn, name, email)"""
     while True:
-        prompt_y, prompt_x = render_manager_menu(stdscr, manager_row[1])
-        choice = get_command(stdscr, prompt_y, prompt_x)
+        choice = render_manager_menu(stdscr, manager_row[1])
         if choice in QUIT_CMDS:
             return
-        rows, _ = stdscr.getmaxyx()
-        show_status(stdscr, rows - 3, 4, "TODO", "warn")
-        curses.flushinp()
-        stdscr.getch()
+        action = MANAGER_ACTIONS.get(choice)
+        if action is None:
+            rows, _ = stdscr.getmaxyx()
+            show_status(stdscr, rows - 3, 4,
+                        "NOT YET IMPLEMENTED.", "warn")
+            curses.flushinp()
+            stdscr.getch()
+            continue
+        action(stdscr)
 
 
 def client_loop(stdscr, client_row):
     while True:
-        prompt_y, prompt_x = render_client_menu(stdscr, client_row[1])
-        choice = get_command(stdscr, prompt_y, prompt_x)
+        choice = render_client_menu(stdscr, client_row[1])
         if choice in QUIT_CMDS:
             return
         rows, _ = stdscr.getmaxyx()
@@ -289,8 +512,7 @@ def main(stdscr):
 
     splash(stdscr)
     while True:
-        prompt_y, prompt_x = render_main_menu(stdscr)
-        choice = get_command(stdscr, prompt_y, prompt_x)
+        choice = render_main_menu(stdscr)
 
         if choice in QUIT_CMDS:
             return

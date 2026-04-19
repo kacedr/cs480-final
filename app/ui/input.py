@@ -88,7 +88,7 @@ def draw_form(stdscr, title, fields):
 def draw_repeating_form(stdscr, title, fields, prompt_more="ADD ANOTHER?"):
     """
     Collect one or more sets of fields. After each set, asks if the user
-    wants to add another. Returns a list of value-lists.
+    wants to add another. Returns a list of value lists.
 
     fields: list of (label, max_len) tuples
     Returns: list of lists, e.g. [["123 Main", "5", "Chicago"], ["456 Oak", "10", "Denver"]]
