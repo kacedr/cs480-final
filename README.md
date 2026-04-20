@@ -93,7 +93,8 @@ You should see the main menu. Use the number keys to navigate.
     │       ├── theme.py      # color pairs, box chars, banner text
     │       ├── primitives.py # safe_addstr, draw_box, init_colors, sizing
     │       ├── screens.py    # splash, main menu, status, pause
-    │       └── input.py      # get_command, get_field
+    │       ├── input.py      # get_command, get_field
+    │       └── validate.py   # input validation
     ├── db/
     │   ├── schema.sql        # CREATE TABLE statements
     │   ├── seed.sql          # sample data
