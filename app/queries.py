@@ -243,11 +243,11 @@ def top_k_clients_by_bookings(k):
     
 # Manager list / lookup helpers
 def list_hotels():
-    """Returns list of (hotel_id, name, street_name, street_number, city)."""
+    """Returns list of (hotel_id, name, street_number, street_name, city)."""
     conn = get_connection()
     with conn.cursor() as cur:
         cur.execute(
-            "SELECT h.hotel_id, h.name, a.street_name, a.street_number, a.city "
+            "SELECT h.hotel_id, h.name, a.street_number, a.street_name, a.city "
             "FROM hotel h JOIN address a ON h.address_id = a.address_id "
             "ORDER BY h.hotel_id;"
         )

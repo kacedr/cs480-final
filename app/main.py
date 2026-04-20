@@ -13,6 +13,7 @@ from app.ui.screens import (
 )
 from app.ui.input import get_command, draw_form, draw_repeating_form, confirm
 from app.ui.theme import PAIR_DEFAULT, QUIT_CMDS
+from app.ui import validate as v
 
 # Actions
 def test_connection_action(stdscr):
@@ -46,7 +47,12 @@ def do_manager_login(stdscr):
     if not vals:
         return None
 
-    ssn = vals[0]
+    try:
+        ssn = v.ssn(vals[0])
+    except ValueError as e:
+        after_action(stdscr, str(e), "err")
+        return None
+
     try:
         row = queries.manager_login(ssn)
     except Exception as e:
@@ -80,7 +86,14 @@ def do_manager_register(stdscr):
     if not vals:
         return None
 
-    name, ssn, email = vals
+    try:
+        name  = v.non_empty(vals[0], "NAME", 100)
+        ssn   = v.ssn(vals[1])
+        email = v.email(vals[2])
+    except ValueError as e:
+        after_action(stdscr, str(e), "err")
+        return None
+
     try:
         row = queries.register_manager(ssn, name, email)
     except Exception as e:
@@ -132,7 +145,12 @@ def do_client_login(stdscr):
     if not vals:
         return None
 
-    email = vals[0]
+    try:
+        email = v.email(vals[0])
+    except ValueError as e:
+        after_action(stdscr, str(e), "err")
+        return None
+
     try:
         row = queries.client_login(email)
     except Exception as e:
@@ -170,7 +188,13 @@ def do_client_register(stdscr):
     ])
     if not basic:
         return None
-    name, email = basic
+
+    try:
+        name  = v.non_empty(basic[0], "NAME", 100)
+        email = v.email(basic[1])
+    except ValueError as e:
+        after_action(stdscr, str(e), "err")
+        return None
 
     # Step 2: addresses (at least one required)
     addresses = draw_repeating_form(
@@ -202,8 +226,27 @@ def do_client_register(stdscr):
         return None
 
     # Convert to tuples for queries
-    addr_tuples = [(a[0], a[1], a[2]) for a in addresses]
-    card_tuples = [(c[0], c[1], c[2], c[3]) for c in cards]
+    try:
+        addr_tuples = [
+            (
+                v.non_empty(a[0], "STREET NAME",   150),
+                v.non_empty(a[1], "STREET NUMBER",  20),
+                v.non_empty(a[2], "CITY",          100),
+            )
+            for a in addresses
+        ]
+        card_tuples = [
+            (
+                v.card_number(c[0]),
+                v.non_empty(c[1], "BILLING STREET NAME",   150),
+                v.non_empty(c[2], "BILLING STREET NUMBER",  20),
+                v.non_empty(c[3], "BILLING CITY",          100),
+            )
+            for c in cards
+        ]
+    except ValueError as e:
+        after_action(stdscr, str(e), "err")
+        return None
 
     try:
         row = queries.register_client(name, email, addr_tuples, card_tuples)
@@ -271,7 +314,15 @@ def mgr_insert_hotel(stdscr):
     if not vals:
         return
     try:
-        hotel_id = queries.insert_hotel(*vals)
+        name          = v.non_empty(vals[0], "HOTEL NAME",    150)
+        street_name   = v.non_empty(vals[1], "STREET NAME",   150)
+        street_number = v.non_empty(vals[2], "STREET NUMBER",  20)
+        city          = v.non_empty(vals[3], "CITY",          100)
+    except ValueError as e:
+        after_action(stdscr, str(e), "err")
+        return
+    try:
+        hotel_id = queries.insert_hotel(name, street_name, street_number, city)
         after_action(stdscr, f"HOTEL CREATED. ID = {hotel_id}", "ok")
     except Exception as e:
         after_action(stdscr, f"INSERT FAILED: {e}", "err")
@@ -288,12 +339,17 @@ def mgr_insert_room(stdscr):
     if not vals:
         return
     try:
-        queries.insert_room(
-            int(vals[0]), int(vals[1]),
-            int(vals[2]), int(vals[3]),
-            vals[4],
-        )
-        after_action(stdscr, f"ROOM {vals[1]} ADDED TO HOTEL {vals[0]}.", "ok")
+        hotel_id    = v.positive_int(vals[0],     "HOTEL ID")
+        room_number = v.positive_int(vals[1],     "ROOM NUMBER")
+        windows     = v.non_negative_int(vals[2], "NUM WINDOWS")
+        reno        = v.reno_year(vals[3])
+        access      = v.access_type(vals[4])
+    except ValueError as e:
+        after_action(stdscr, str(e), "err")
+        return
+    try:
+        queries.insert_room(hotel_id, room_number, windows, reno, access)
+        after_action(stdscr, f"ROOM {room_number} ADDED TO HOTEL {hotel_id}.", "ok")
     except Exception as e:
         after_action(stdscr, f"INSERT FAILED: {e}", "err")
 
@@ -309,8 +365,17 @@ def mgr_update_hotel(stdscr):
     if not vals:
         return
     try:
-        queries.update_hotel(int(vals[0]), vals[1], vals[2], vals[3], vals[4])
-        after_action(stdscr, f"HOTEL {vals[0]} UPDATED.", "ok")
+        hotel_id      = v.positive_int(vals[0], "HOTEL ID")
+        name          = v.non_empty(vals[1], "NAME",          150)
+        street_name   = v.non_empty(vals[2], "STREET NAME",   150)
+        street_number = v.non_empty(vals[3], "STREET NUMBER",  20)
+        city          = v.non_empty(vals[4], "CITY",          100)
+    except ValueError as e:
+        after_action(stdscr, str(e), "err")
+        return
+    try:
+        queries.update_hotel(hotel_id, name, street_name, street_number, city)
+        after_action(stdscr, f"HOTEL {hotel_id} UPDATED.", "ok")
     except Exception as e:
         after_action(stdscr, f"UPDATE FAILED: {e}", "err")
 
@@ -326,12 +391,17 @@ def mgr_update_room(stdscr):
     if not vals:
         return
     try:
-        queries.update_room(
-            int(vals[0]), int(vals[1]),
-            int(vals[2]), int(vals[3]),
-            vals[4],
-        )
-        after_action(stdscr, f"ROOM {vals[1]} IN HOTEL {vals[0]} UPDATED.", "ok")
+        hotel_id    = v.positive_int(vals[0],     "HOTEL ID")
+        room_number = v.positive_int(vals[1],     "ROOM NUMBER")
+        windows     = v.non_negative_int(vals[2], "NUM WINDOWS")
+        reno        = v.reno_year(vals[3])
+        access      = v.access_type(vals[4])
+    except ValueError as e:
+        after_action(stdscr, str(e), "err")
+        return
+    try:
+        queries.update_room(hotel_id, room_number, windows, reno, access)
+        after_action(stdscr, f"ROOM {room_number} IN HOTEL {hotel_id} UPDATED.", "ok")
     except Exception as e:
         after_action(stdscr, f"UPDATE FAILED: {e}", "err")
 
@@ -342,12 +412,17 @@ def mgr_remove_hotel(stdscr):
     ])
     if not vals:
         return
-    if not confirm(stdscr, f"CONFIRM REMOVAL OF HOTEL {vals[0]}?"):
+    try:
+        hotel_id = v.positive_int(vals[0], "HOTEL ID")
+    except ValueError as e:
+        after_action(stdscr, str(e), "err")
+        return
+    if not confirm(stdscr, f"CONFIRM REMOVAL OF HOTEL {hotel_id}?"):
         after_action(stdscr, "OPERATION CANCELLED.", "warn")
         return
     try:
-        queries.remove_hotel(int(vals[0]))
-        after_action(stdscr, f"HOTEL {vals[0]} REMOVED.", "ok")
+        queries.remove_hotel(hotel_id)
+        after_action(stdscr, f"HOTEL {hotel_id} REMOVED.", "ok")
     except Exception as e:
         after_action(stdscr, f"REMOVE FAILED: {e}", "err")
 
@@ -359,12 +434,18 @@ def mgr_remove_room(stdscr):
     ])
     if not vals:
         return
-    if not confirm(stdscr, f"CONFIRM REMOVAL OF ROOM {vals[1]} IN HOTEL {vals[0]}?"):
+    try:
+        hotel_id    = v.positive_int(vals[0], "HOTEL ID")
+        room_number = v.positive_int(vals[1], "ROOM NUMBER")
+    except ValueError as e:
+        after_action(stdscr, str(e), "err")
+        return
+    if not confirm(stdscr, f"CONFIRM REMOVAL OF ROOM {room_number} IN HOTEL {hotel_id}?"):
         after_action(stdscr, "OPERATION CANCELLED.", "warn")
         return
     try:
-        queries.remove_room(int(vals[0]), int(vals[1]))
-        after_action(stdscr, f"ROOM {vals[1]} IN HOTEL {vals[0]} REMOVED.", "ok")
+        queries.remove_room(hotel_id, room_number)
+        after_action(stdscr, f"ROOM {room_number} IN HOTEL {hotel_id} REMOVED.", "ok")
     except Exception as e:
         after_action(stdscr, f"REMOVE FAILED: {e}", "err")
 
@@ -375,12 +456,17 @@ def mgr_remove_client(stdscr):
     ])
     if not vals:
         return
-    if not confirm(stdscr, f"CONFIRM REMOVAL OF CLIENT {vals[0]}?"):
+    try:
+        client_id = v.positive_int(vals[0], "CLIENT ID")
+    except ValueError as e:
+        after_action(stdscr, str(e), "err")
+        return
+    if not confirm(stdscr, f"CONFIRM REMOVAL OF CLIENT {client_id}?"):
         after_action(stdscr, "OPERATION CANCELLED.", "warn")
         return
     try:
-        queries.remove_client(int(vals[0]))
-        after_action(stdscr, f"CLIENT {vals[0]} REMOVED.", "ok")
+        queries.remove_client(client_id)
+        after_action(stdscr, f"CLIENT {client_id} REMOVED.", "ok")
     except Exception as e:
         after_action(stdscr, f"REMOVE FAILED: {e}", "err")
 
@@ -392,10 +478,11 @@ def mgr_top_k_clients(stdscr):
     if not vals:
         return
     try:
-        k = int(vals[0])
-        if k <= 0:
-            raise ValueError("K must be positive")
+        k = v.positive_int(vals[0], "K")
         results = queries.top_k_clients_by_bookings(k)
+    except ValueError as e:
+        after_action(stdscr, str(e), "err")
+        return
     except Exception as e:
         after_action(stdscr, f"QUERY FAILED: {e}", "err")
         return
@@ -416,7 +503,7 @@ def mgr_list_hotels(stdscr):
     render_table(
         stdscr,
         "HOTELS",
-        ["ID", "NAME", "STREET", "NUMBER", "CITY"],
+        ["ID", "NAME", "STREET #", "STREET", "CITY"],
         results,
     )
 
@@ -425,14 +512,12 @@ def mgr_list_rooms(stdscr):
     vals = draw_form(stdscr, "LIST ROOMS (BLANK = ALL)", [
         ("HOTEL ID (OPTIONAL)", 10),
     ])
-    if vals is None:
-        return
     hotel_id = None
-    if vals[0]:
+    if vals and vals[0]:
         try:
-            hotel_id = int(vals[0])
-        except ValueError:
-            after_action(stdscr, "HOTEL ID MUST BE A NUMBER.", "err")
+            hotel_id = v.positive_int(vals[0], "HOTEL ID")
+        except ValueError as e:
+            after_action(stdscr, str(e), "err")
             return
     try:
         results = queries.list_rooms(hotel_id)
