@@ -453,11 +453,23 @@ def mgr_list_clients(stdscr):
     except Exception as e:
         after_action(stdscr, f"QUERY FAILED: {e}", "err")
         return
+
+    # Blank out repeated client info so each client's rows read as a group
+    display_rows = []
+    last_id = None
+    for row in results:
+        client_id, name, email, street_num, street_name, city = row
+        if client_id == last_id:
+            display_rows.append(("", "", "", street_num, street_name, city))
+        else:
+            display_rows.append(row)
+            last_id = client_id
+
     render_table(
         stdscr,
         "CLIENTS",
-        ["ID", "NAME", "EMAIL"],
-        results,
+        ["ID", "NAME", "EMAIL", "STREET #", "STREET", "CITY"],
+        display_rows,
     )
 
 # Loops for each user and their actions

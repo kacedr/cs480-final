@@ -107,7 +107,7 @@ CREATE TABLE booking (
     booking_id    SERIAL        PRIMARY KEY,
     client_id     INTEGER       NOT NULL
         REFERENCES client(client_id)
-        ON UPDATE CASCADE ON DELETE RESTRICT,
+        ON UPDATE CASCADE ON DELETE CASCADE, -- When we delete a client we will remove all of its bookings
     hotel_id      INTEGER       NOT NULL,
     room_number   INTEGER       NOT NULL,
     start_date    DATE          NOT NULL,

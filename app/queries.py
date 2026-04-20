@@ -281,10 +281,16 @@ def list_rooms(hotel_id=None):
 
 
 def list_clients():
-    """Returns list of (client_id, name, email)."""
+    """Returns one row per (client, address) pair: 
+    (client_id, name, email, street_number, street_name, city)."""
     conn = get_connection()
     with conn.cursor() as cur:
         cur.execute(
-            "SELECT client_id, name, email FROM client ORDER BY client_id;"
+            "SELECT c.client_id, c.name, c.email, "
+            "a.street_number, a.street_name, a.city "
+            "FROM client c "
+            "JOIN client_address ca ON c.client_id = ca.client_id "
+            "JOIN address a ON ca.address_id = a.address_id "
+            "ORDER BY c.client_id, a.address_id;"
         )
         return cur.fetchall()
