@@ -556,6 +556,88 @@ def mgr_list_clients(stdscr):
         ["ID", "NAME", "EMAIL", "STREET #", "STREET", "CITY"],
         display_rows,
     )
+ 
+
+def mgr_room_booking_counts(stdscr):
+    try:
+        results = queries.room_booking_counts()
+    except Exception as e:
+        after_action(stdscr, f"QUERY FAILED: {e}", "err")
+        return
+    render_table(
+        stdscr,
+        "ROOM BOOKING COUNTS",
+        ["HOTEL", "ROOM", "BOOKINGS"],
+        results,
+    )
+
+
+def mgr_hotel_statistics(stdscr):
+    try:
+        results = queries.hotel_statistics()
+    except Exception as e:
+        after_action(stdscr, f"QUERY FAILED: {e}", "err")
+        return
+    render_table(
+        stdscr,
+        "HOTEL STATISTICS",
+        ["HOTEL", "TOTAL BOOKINGS", "AVG RATING"],
+        results,
+    )
+
+
+def mgr_clients_by_city_pair(stdscr):
+    vals = draw_form(stdscr, "CLIENTS BY CITY PAIR", [
+        ("CITY 1 (CLIENT ADDRESS)", 64),
+        ("CITY 2 (HOTEL LOCATION)", 64),
+    ])
+    if not vals:
+        return
+    try:
+        c1 = v.non_empty(vals[0], "CITY 1", 100)
+        c2 = v.non_empty(vals[1], "CITY 2", 100)
+        results = queries.clients_by_city_pair(c1, c2)
+    except ValueError as e:
+        after_action(stdscr, str(e), "err")
+        return
+    except Exception as e:
+        after_action(stdscr, f"QUERY FAILED: {e}", "err")
+        return
+
+    render_table(
+        stdscr,
+        f"CLIENTS: ADDR IN {c1.upper()} / BOOKED IN {c2.upper()}",
+        ["NAME", "EMAIL"],
+        results,
+    )
+
+
+def mgr_problematic_hotels(stdscr):
+    try:
+        results = queries.problematic_hotels()
+    except Exception as e:
+        after_action(stdscr, f"QUERY FAILED: {e}", "err")
+        return
+    render_table(
+        stdscr,
+        "PROBLEMATIC HOTELS (CHICAGO)",
+        ["HOTEL NAME"],
+        results,
+    )
+
+
+def mgr_client_spending_report(stdscr):
+    try:
+        results = queries.client_spending_report()
+    except Exception as e:
+        after_action(stdscr, f"QUERY FAILED: {e}", "err")
+        return
+    render_table(
+        stdscr,
+        "CLIENT SPENDING REPORT",
+        ["CLIENT", "TOTAL SPENT ($)"],
+        results,
+    )
 
 # Loops for each user and their actions
 MANAGER_ACTIONS = {
@@ -570,6 +652,11 @@ MANAGER_ACTIONS = {
     "9":  mgr_remove_room,
     "10": mgr_remove_client,
     "11": mgr_top_k_clients,
+    "12": mgr_room_booking_counts,
+    "13": mgr_hotel_statistics,
+    "14": mgr_clients_by_city_pair,
+    "15": mgr_problematic_hotels,
+    "16": mgr_client_spending_report,
 }
 
 def manager_loop(stdscr, manager_row):

@@ -241,6 +241,89 @@ def top_k_clients_by_bookings(k):
         )
         return cur.fetchall()
     
+def room_booking_counts():
+    """Returns list of (hotel_name, room_number, num_bookings) for every room."""
+    conn = get_connection()
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT h.name, r.room_number, "
+            "(SELECT COUNT(*) FROM booking b "
+            " WHERE b.hotel_id = r.hotel_id AND b.room_number = r.room_number) AS num_bookings "
+            "FROM room r "
+            "JOIN hotel h ON r.hotel_id = h.hotel_id "
+            "ORDER BY r.hotel_id, r.room_number;"
+        )
+        return cur.fetchall()
+
+
+def hotel_statistics():
+    """Returns list of (hotel_name, total_bookings, avg_rating) for every hotel."""
+    conn = get_connection()
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT h.name, "
+            "(SELECT COUNT(*) FROM booking b WHERE b.hotel_id = h.hotel_id) AS total_bookings, "
+            "(SELECT ROUND(AVG(rv.rating), 2) FROM review rv WHERE rv.hotel_id = h.hotel_id) AS avg_rating "
+            "FROM hotel h "
+            "ORDER BY h.hotel_id;"
+        )
+        return cur.fetchall()
+
+
+def clients_by_city_pair(c1, c2):
+    """Returns list of (name, email) for clients with an address in c1 who booked a hotel in c2."""
+    conn = get_connection()
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT DISTINCT c.name, c.email "
+            "FROM client c "
+            "JOIN client_address ca ON c.client_id = ca.client_id "
+            "JOIN address a ON ca.address_id = a.address_id "
+            "JOIN booking b ON c.client_id = b.client_id "
+            "JOIN hotel h ON b.hotel_id = h.hotel_id "
+            "JOIN address ha ON h.address_id = ha.address_id "
+            "WHERE a.city = %s AND ha.city = %s;",
+            (c1, c2),
+        )
+        return cur.fetchall()
+
+
+def problematic_hotels():
+    """Returns hotel names in Chicago with avg rating < 2, booked by >= 2 clients with no Chicago address."""
+    conn = get_connection()
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT h.name "
+            "FROM hotel h "
+            "JOIN address ha ON h.address_id = ha.address_id "
+            "WHERE ha.city = 'Chicago' "
+            "AND (SELECT AVG(rv.rating) FROM review rv WHERE rv.hotel_id = h.hotel_id) < 2 "
+            "AND (SELECT COUNT(DISTINCT b.client_id) "
+            "     FROM booking b "
+            "     WHERE b.hotel_id = h.hotel_id "
+            "     AND b.client_id NOT IN ( "
+            "         SELECT ca.client_id "
+            "         FROM client_address ca "
+            "         JOIN address a ON ca.address_id = a.address_id "
+            "         WHERE a.city = 'Chicago' "
+            "     )) >= 2;"
+        )
+        return cur.fetchall()
+
+
+def client_spending_report():
+    """Returns list of (client_name, total_spent) ordered by total spent descending."""
+    conn = get_connection()
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT c.name, SUM(b.price_per_day * (b.end_date - b.start_date + 1)) AS total_spent "
+            "FROM client c "
+            "JOIN booking b ON c.client_id = b.client_id "
+            "GROUP BY c.client_id, c.name "
+            "ORDER BY total_spent DESC;"
+        )
+        return cur.fetchall()
+    
 # Manager list / lookup helpers
 def list_hotels():
     """Returns list of (hotel_id, name, street_number, street_name, city)."""
