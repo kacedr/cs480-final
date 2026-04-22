@@ -72,3 +72,23 @@ def access_type(val):
     if v not in ("elevator", "stairs"):
         raise ValueError("ACCESS MUST BE 'elevator' OR 'stairs'")
     return v
+
+
+def booking_date(val):
+    from datetime import date as _date
+    v = val.strip()
+    try:
+        return _date.fromisoformat(v)
+    except ValueError:
+        raise ValueError("DATE MUST BE YYYY-MM-DD")
+
+
+def price(val):
+    v = val.strip()
+    try:
+        n = float(v)
+    except ValueError:
+        raise ValueError("PRICE MUST BE A NUMBER")
+    if n < 0:
+        raise ValueError("PRICE CANNOT BE NEGATIVE")
+    return round(n, 2)

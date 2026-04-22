@@ -363,6 +363,232 @@ def list_rooms(hotel_id=None):
         return cur.fetchall()
 
 
+# client queries
+
+def update_client_name(client_id, name):
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE client SET name = %s WHERE client_id = %s;",
+                (name, client_id),
+            )
+            conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+
+
+def get_client_addresses(client_id):
+    conn = get_connection()
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT a.address_id, a.street_number, a.street_name, a.city "
+            "FROM address a "
+            "JOIN client_address ca ON a.address_id = ca.address_id "
+            "WHERE ca.client_id = %s "
+            "ORDER BY a.address_id;",
+            (client_id,),
+        )
+        return cur.fetchall()
+
+
+def add_client_address(client_id, street_name, street_number, city):
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO address (street_name, street_number, city) "
+                "VALUES (%s, %s, %s) RETURNING address_id;",
+                (street_name, street_number, city),
+            )
+            address_id = cur.fetchone()[0]
+            cur.execute(
+                "INSERT INTO client_address (client_id, address_id) VALUES (%s, %s);",
+                (client_id, address_id),
+            )
+            conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+
+
+def remove_client_address(client_id, address_id):
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT COUNT(*) FROM client_address WHERE client_id = %s;",
+                (client_id,),
+            )
+            if cur.fetchone()[0] <= 1:
+                raise ValueError("CANNOT REMOVE LAST ADDRESS")
+            cur.execute(
+                "DELETE FROM client_address WHERE client_id = %s AND address_id = %s;",
+                (client_id, address_id),
+            )
+            if cur.rowcount == 0:
+                raise ValueError("ADDRESS NOT FOUND FOR THIS CLIENT")
+            conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+
+
+def get_client_cards(client_id):
+    conn = get_connection()
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT cc.card_number, a.street_number, a.street_name, a.city "
+            "FROM credit_card cc "
+            "JOIN address a ON cc.billing_address_id = a.address_id "
+            "WHERE cc.client_id = %s "
+            "ORDER BY cc.card_number;",
+            (client_id,),
+        )
+        return cur.fetchall()
+
+
+def add_client_card(client_id, card_number, b_street, b_number, b_city):
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO address (street_name, street_number, city) "
+                "VALUES (%s, %s, %s) RETURNING address_id;",
+                (b_street, b_number, b_city),
+            )
+            billing_id = cur.fetchone()[0]
+            cur.execute(
+                "INSERT INTO credit_card (card_number, client_id, billing_address_id) "
+                "VALUES (%s, %s, %s);",
+                (card_number, client_id, billing_id),
+            )
+            conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+
+
+def remove_client_card(client_id, card_number):
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT COUNT(*) FROM credit_card WHERE client_id = %s;",
+                (client_id,),
+            )
+            if cur.fetchone()[0] <= 1:
+                raise ValueError("CANNOT REMOVE LAST CREDIT CARD")
+            cur.execute(
+                "DELETE FROM credit_card WHERE client_id = %s AND card_number = %s;",
+                (client_id, card_number),
+            )
+            if cur.rowcount == 0:
+                raise ValueError("CARD NOT FOUND FOR THIS CLIENT")
+            conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+
+
+# Searching rooms.
+
+def search_available_rooms(start_date, end_date):
+    conn = get_connection()
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT h.name, r.room_number, r.num_windows, r.last_reno_year, r.access_type "
+            "FROM room r "
+            "JOIN hotel h ON r.hotel_id = h.hotel_id "
+            "WHERE NOT EXISTS ("
+            "    SELECT 1 FROM booking b "
+            "    WHERE b.hotel_id = r.hotel_id AND b.room_number = r.room_number "
+            "    AND daterange(b.start_date, b.end_date, '[]') && daterange(%s, %s, '[]')"
+            ") "
+            "ORDER BY h.name, r.room_number;",
+            (start_date, end_date),
+        )
+        return cur.fetchall()
+
+
+# client book
+
+def book_room(client_id, hotel_id, room_number, start_date, end_date, price_per_day):
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO booking "
+                "(client_id, hotel_id, room_number, start_date, end_date, price_per_day) "
+                "VALUES (%s, %s, %s, %s, %s, %s) RETURNING booking_id;",
+                (client_id, hotel_id, room_number, start_date, end_date, price_per_day),
+            )
+            booking_id = cur.fetchone()[0]
+            conn.commit()
+            return booking_id
+    except Exception:
+        conn.rollback()
+        raise
+
+
+def auto_book_room(client_id, hotel_id, start_date, end_date, price_per_day):
+    """Books the first available room in hotel_id. Returns (room_number, hotel_name) or None."""
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT r.room_number FROM room r "
+                "WHERE r.hotel_id = %s "
+                "AND NOT EXISTS ("
+                "    SELECT 1 FROM booking b "
+                "    WHERE b.hotel_id = r.hotel_id AND b.room_number = r.room_number "
+                "    AND daterange(b.start_date, b.end_date, '[]') && daterange(%s, %s, '[]')"
+                ") "
+                "LIMIT 1;",
+                (hotel_id, start_date, end_date),
+            )
+            row = cur.fetchone()
+            if row is None:
+                return None
+            room_number = row[0]
+            cur.execute(
+                "INSERT INTO booking "
+                "(client_id, hotel_id, room_number, start_date, end_date, price_per_day) "
+                "VALUES (%s, %s, %s, %s, %s, %s);",
+                (client_id, hotel_id, room_number, start_date, end_date, price_per_day),
+            )
+            cur.execute("SELECT name FROM hotel WHERE hotel_id = %s;", (hotel_id,))
+            hotel_name = cur.fetchone()[0]
+            conn.commit()
+            return (room_number, hotel_name)
+    except Exception:
+        conn.rollback()
+        raise
+
+
+def suggest_alternative_hotels(hotel_id, start_date, end_date):
+    conn = get_connection()
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT DISTINCT h.hotel_id, h.name "
+            "FROM hotel h "
+            "WHERE h.hotel_id != %s "
+            "AND EXISTS ("
+            "    SELECT 1 FROM room r "
+            "    WHERE r.hotel_id = h.hotel_id "
+            "    AND NOT EXISTS ("
+            "        SELECT 1 FROM booking b "
+            "        WHERE b.hotel_id = r.hotel_id AND b.room_number = r.room_number "
+            "        AND daterange(b.start_date, b.end_date, '[]') && daterange(%s, %s, '[]')"
+            "    )"
+            ") "
+            "ORDER BY h.name;",
+            (hotel_id, start_date, end_date),
+        )
+        return cur.fetchall()
+
+
 def list_clients():
     """Returns one row per (client, address) pair: 
     (client_id, name, email, street_number, street_name, city)."""

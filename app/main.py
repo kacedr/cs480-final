@@ -639,6 +639,236 @@ def mgr_client_spending_report(stdscr):
         results,
     )
 
+#clients section
+def client_update_name(stdscr, client_row):
+    vals = draw_form(stdscr, "UPDATE NAME", [
+        ("NEW NAME", 64),
+    ])
+    if not vals:
+        return client_row
+    try:
+        name = v.non_empty(vals[0], "NAME", 100)
+    except ValueError as e:
+        after_action(stdscr, str(e), "err")
+        return client_row
+    try:
+        queries.update_client_name(client_row[0], name)
+        after_action(stdscr, f"NAME UPDATED TO {name.upper()}.", "ok")
+        return [client_row[0], name, client_row[2]]
+    except Exception as e:
+        after_action(stdscr, f"UPDATE FAILED: {e}", "err")
+        return client_row
+
+
+def client_manage_addresses(stdscr, client_id):
+    while True:
+        try:
+            addrs = queries.get_client_addresses(client_id)
+        except Exception as e:
+            after_action(stdscr, f"QUERY FAILED: {e}", "err")
+            return
+        render_table(stdscr, "MY ADDRESSES", ["ID", "STREET #", "STREET", "CITY"], addrs)
+        vals = draw_form(stdscr, "MANAGE ADDRESSES", [
+            ("ACTION: (A)DD / (R)EMOVE / (Q)UIT", 1),
+        ])
+        if not vals:
+            return
+        action = vals[0].strip().upper()
+        if action in ("Q", "0", ""):
+            return
+        elif action == "A":
+            aVals = draw_form(stdscr, "ADD ADDRESS", [
+                ("STREET NAME",   64),
+                ("STREET NUMBER", 20),
+                ("CITY",          64),
+            ])
+            if not aVals:
+                continue
+            try:
+                sname = v.non_empty(aVals[0], "STREET NAME",   150)
+                snum  = v.non_empty(aVals[1], "STREET NUMBER",  20)
+                city  = v.non_empty(aVals[2], "CITY",          100)
+                queries.add_client_address(client_id, sname, snum, city)
+                after_action(stdscr, "ADDRESS ADDED.", "ok")
+            except ValueError as e:
+                after_action(stdscr, str(e), "err")
+            except Exception as e:
+                after_action(stdscr, f"ADD FAILED: {e}", "err")
+        elif action == "R":
+            rvals = draw_form(stdscr, "REMOVE ADDRESS", [("ADDRESS ID", 10)])
+            if not rvals:
+                continue
+            try:
+                addr_id = v.positive_int(rvals[0], "ADDRESS ID")
+                queries.remove_client_address(client_id, addr_id)
+                after_action(stdscr, "ADDRESS REMOVED.", "ok")
+            except ValueError as e:
+                after_action(stdscr, str(e), "err")
+            except Exception as e:
+                after_action(stdscr, f"REMOVE FAILED: {e}", "err")
+        else:
+            after_action(stdscr, "UNKNOWN ACTION.", "err")
+
+
+def client_manage_cards(stdscr, client_id):
+    while True:
+        try:
+            cards = queries.get_client_cards(client_id)
+        except Exception as e:
+            after_action(stdscr, f"QUERY FAILED: {e}", "err")
+            return
+        render_table(
+            stdscr, "MY CREDIT CARDS",
+            ["CARD NUMBER", "BILLING STREET #", "BILLING STREET", "BILLING CITY"],
+            cards,
+        )
+        vals = draw_form(stdscr, "MANAGE CREDIT CARDS", [
+            ("ACTION: (A)DD / (R)EMOVE / (Q)UIT", 1),
+        ])
+        if not vals:
+            return
+        action = vals[0].strip().upper()
+        if action in ("Q", "0", ""):
+            return
+        elif action == "A":
+            cVals = draw_form(stdscr, "ADD CREDIT CARD", [
+                ("CARD NUMBER",           19),
+                ("BILLING STREET NAME",   64),
+                ("BILLING STREET NUMBER", 20),
+                ("BILLING CITY",          64),
+            ])
+            if not cVals:
+                continue
+            try:
+                card_num = v.card_number(cVals[0])
+                b_street = v.non_empty(cVals[1], "BILLING STREET NAME",   150)
+                b_num    = v.non_empty(cVals[2], "BILLING STREET NUMBER",  20)
+                b_city   = v.non_empty(cVals[3], "BILLING CITY",          100)
+                queries.add_client_card(client_id, card_num, b_street, b_num, b_city)
+                after_action(stdscr, "CARD ADDED.", "ok")
+            except ValueError as e:
+                after_action(stdscr, str(e), "err")
+            except Exception as e:
+                after_action(stdscr, f"ADD FAILED: {e}", "err")
+        elif action == "R":
+            rvals = draw_form(stdscr, "REMOVE CARD", [("CARD NUMBER", 19)])
+            if not rvals:
+                continue
+            try:
+                queries.remove_client_card(client_id, rvals[0].strip())
+                after_action(stdscr, "CARD REMOVED.", "ok")
+            except ValueError as e:
+                after_action(stdscr, str(e), "err")
+            except Exception as e:
+                after_action(stdscr, f"REMOVE FAILED: {e}", "err")
+        else:
+            after_action(stdscr, "UNKNOWN ACTION.", "err")
+
+
+def client_search_rooms(stdscr):
+    vals = draw_form(stdscr, "SEARCH AVAILABLE ROOMS", [
+        ("START DATE (YYYY-MM-DD)", 10),
+        ("END DATE   (YYYY-MM-DD)", 10),
+    ])
+    if not vals:
+        return
+    try:
+        start = v.booking_date(vals[0])
+        end   = v.booking_date(vals[1])
+        if end <= start:
+            raise ValueError("END DATE MUST BE AFTER START DATE")
+    except ValueError as e:
+        after_action(stdscr, str(e), "err")
+        return
+    try:
+        results = queries.search_available_rooms(start, end)
+    except Exception as e:
+        after_action(stdscr, f"QUERY FAILED: {e}", "err")
+        return
+    render_table(
+        stdscr,
+        f"AVAILABLE ROOMS  {start}  TO  {end}",
+        ["HOTEL", "ROOM", "WINDOWS", "RENO YEAR", "ACCESS"],
+        results,
+    )
+
+
+def client_book_room(stdscr, client_id):
+    vals = draw_form(stdscr, "BOOK A ROOM", [
+        ("HOTEL ID",               10),
+        ("ROOM NUMBER",            10),
+        ("START DATE (YYYY-MM-DD)", 10),
+        ("END DATE   (YYYY-MM-DD)", 10),
+        ("PRICE PER DAY",           10),
+    ])
+    if not vals:
+        return
+    try:
+        hotel_id    = v.positive_int(vals[0], "HOTEL ID")
+        room_number = v.positive_int(vals[1], "ROOM NUMBER")
+        start       = v.booking_date(vals[2])
+        end         = v.booking_date(vals[3])
+        if end <= start:
+            raise ValueError("END DATE MUST BE AFTER START DATE")
+        price = v.price(vals[4])
+    except ValueError as e:
+        after_action(stdscr, str(e), "err")
+        return
+    try:
+        booking_id = queries.book_room(client_id, hotel_id, room_number, start, end, price)
+        after_action(stdscr, f"BOOKING CONFIRMED. ID = {booking_id}", "ok")
+    except Exception as e:
+        after_action(stdscr, f"BOOKING FAILED: {e}", "err")
+
+
+def client_auto_book(stdscr, client_id):
+    vals = draw_form(stdscr, "AUTO-BOOK A ROOM", [
+        ("HOTEL ID",               10),
+        ("START DATE (YYYY-MM-DD)", 10),
+        ("END DATE   (YYYY-MM-DD)", 10),
+        ("PRICE PER DAY",           10),
+    ])
+    if not vals:
+        return
+    try:
+        hotel_id = v.positive_int(vals[0], "HOTEL ID")
+        start    = v.booking_date(vals[1])
+        end      = v.booking_date(vals[2])
+        if end <= start:
+            raise ValueError("END DATE MUST BE AFTER START DATE")
+        price = v.price(vals[3])
+    except ValueError as e:
+        after_action(stdscr, str(e), "err")
+        return
+    try:
+        result = queries.auto_book_room(client_id, hotel_id, start, end, price)
+    except Exception as e:
+        after_action(stdscr, f"BOOKING FAILED: {e}", "err")
+        return
+    if result is not None:
+        room_number, hotel_name = result
+        after_action(
+            stdscr,
+            f"BOOKED ROOM {room_number} AT {hotel_name.upper()} ({start} TO {end}).",
+            "ok",
+        )
+    else:
+        try:
+            alts = queries.suggest_alternative_hotels(hotel_id, start, end)
+        except Exception as e:
+            after_action(stdscr, f"NO ROOMS AVAILABLE. QUERY FAILED: {e}", "err")
+            return
+        if alts:
+            render_table(
+                stdscr,
+                "NO ROOMS AVAILABLE — ALTERNATIVE HOTELS:",
+                ["ID", "HOTEL NAME"],
+                alts,
+            )
+        else:
+            after_action(stdscr, "NO ROOMS AVAILABLE. NO ALTERNATIVES FOUND.", "warn")
+
+
 # Loops for each user and their actions
 MANAGER_ACTIONS = {
     "1":  mgr_list_hotels,
@@ -677,14 +907,28 @@ def manager_loop(stdscr, manager_row):
 
 
 def client_loop(stdscr, client_row):
+    client_row = list(client_row)
     while True:
         choice = render_client_menu(stdscr, client_row[1])
         if choice in QUIT_CMDS:
             return
-        rows, _ = stdscr.getmaxyx()
-        show_status(stdscr, rows - 3, 4, "TODO", "warn")
-        curses.flushinp()
-        stdscr.getch()
+        if choice == "1":
+            client_row = client_update_name(stdscr, client_row)
+        elif choice == "2":
+            client_manage_addresses(stdscr, client_row[0])
+        elif choice == "3":
+            client_manage_cards(stdscr, client_row[0])
+        elif choice == "4":
+            client_search_rooms(stdscr)
+        elif choice == "5":
+            client_book_room(stdscr, client_row[0])
+        elif choice == "6":
+            client_auto_book(stdscr, client_row[0])
+        else:
+            rows, _ = stdscr.getmaxyx()
+            show_status(stdscr, rows - 3, 4, "NOT YET IMPLEMENTED.", "warn")
+            curses.flushinp()
+            stdscr.getch()
 
 
 # App lifecycle
