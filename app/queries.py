@@ -603,3 +603,46 @@ def list_clients():
             "ORDER BY c.client_id, a.address_id;"
         )
         return cur.fetchall()
+
+
+def get_client_bookings(client_id):
+    """Returns list of (booking_id, hotel_name, room_number, start_date, end_date, total_cost) for a client."""
+    conn = get_connection()
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT b.booking_id, h.name, b.room_number, b.start_date, b.end_date, "
+            "b.price_per_day * (b.end_date - b.start_date + 1) AS total_cost "
+            "FROM booking b "
+            "JOIN hotel h ON b.hotel_id = h.hotel_id "
+            "WHERE b.client_id = %s "
+            "ORDER BY b.start_date DESC;",
+            (client_id,),
+        )
+        return cur.fetchall()
+
+
+def submit_review(client_id, hotel_id, message, rating):
+    """Inserts a review. Raises ValueError if client has not booked at this hotel."""
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT 1 FROM booking WHERE client_id = %s AND hotel_id = %s LIMIT 1;",
+                (client_id, hotel_id),
+            )
+            if cur.fetchone() is None:
+                raise ValueError("YOU HAVE NOT STAYED AT THIS HOTEL")
+            cur.execute(
+                "SELECT COALESCE(MAX(review_id), 0) + 1 FROM review WHERE hotel_id = %s;",
+                (hotel_id,),
+            )
+            review_id = cur.fetchone()[0]
+            cur.execute(
+                "INSERT INTO review (hotel_id, review_id, client_id, message, rating) "
+                "VALUES (%s, %s, %s, %s, %s);",
+                (hotel_id, review_id, client_id, message, rating),
+            )
+            conn.commit()
+    except Exception:
+        conn.rollback()
+        raise

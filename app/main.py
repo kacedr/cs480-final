@@ -906,6 +906,46 @@ def manager_loop(stdscr, manager_row):
         action(stdscr)
 
 
+def client_view_bookings(stdscr, client_id):
+    try:
+        results = queries.get_client_bookings(client_id)
+    except Exception as e:
+        after_action(stdscr, f"QUERY FAILED: {e}", "err")
+        return
+    render_table(
+        stdscr,
+        "MY BOOKINGS",
+        ["ID", "HOTEL", "ROOM", "START", "END", "TOTAL ($)"],
+        results,
+    )
+
+
+def client_write_review(stdscr, client_id):
+    vals = draw_form(stdscr, "WRITE A REVIEW", [
+        ("HOTEL ID",       10),
+        ("RATING (0-10)",   2),
+        ("MESSAGE",       128),
+    ])
+    if not vals:
+        return
+    try:
+        hotel_id = v.positive_int(vals[0], "HOTEL ID")
+        rating   = v.non_negative_int(vals[1], "RATING")
+        if rating > 10:
+            raise ValueError("RATING MUST BE BETWEEN 0 AND 10")
+        message  = vals[2].strip()
+    except ValueError as e:
+        after_action(stdscr, str(e), "err")
+        return
+    try:
+        queries.submit_review(client_id, hotel_id, message, rating)
+        after_action(stdscr, "REVIEW SUBMITTED.", "ok")
+    except ValueError as e:
+        after_action(stdscr, str(e), "err")
+    except Exception as e:
+        after_action(stdscr, f"SUBMIT FAILED: {e}", "err")
+
+
 def client_loop(stdscr, client_row):
     client_row = list(client_row)
     while True:
@@ -924,6 +964,10 @@ def client_loop(stdscr, client_row):
             client_book_room(stdscr, client_row[0])
         elif choice == "6":
             client_auto_book(stdscr, client_row[0])
+        elif choice == "7":
+            client_view_bookings(stdscr, client_row[0])
+        elif choice == "8":
+            client_write_review(stdscr, client_row[0])
         else:
             rows, _ = stdscr.getmaxyx()
             show_status(stdscr, rows - 3, 4, "NOT YET IMPLEMENTED.", "warn")
